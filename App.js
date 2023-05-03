@@ -9,6 +9,7 @@ import Scanner from './src/Scanner';
 import List from './src/List';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -20,24 +21,47 @@ export default function App() {
       alert('Scanned data: ' + data);
       updateScannedData(scannedData.concat(JSON.parse(data)));
       setScannerOn(false);
+      storeData(data);
+  }
+
+  const storeData = async (value) => {
+    try {
+      const newBarcode = JSON.parse(value)
+      var barcodes = await getBarcodesFromStorage();
+      await AsyncStorage.setItem('@barcodes', JSON.stringify(barcodes.concat(newBarcode)));
+    } catch (e) {
+      // saving error
+    }
+  }
+
+  const getBarcodesFromStorage = async () => {
+    try {
+      const barcodes = await AsyncStorage.getItem('@barcodes');
+      console.info(barcodes);
+      return barcodes != null ? JSON.parse(barcodes) : [];
+    } catch(e) {
+      // error reading valueć
+    }
   }
 
   const sendData = async () => {
-    const input = {
-      "QueueUrl": "https://sqs.eu-central-1.amazonaws.com/189706958568/dev-frontwit-scanned-barcode",
-      "MessageBody": JSON.stringify({"DUPA": "dupa"}),
-      "DelaySeconds": 0
-    };
-    const command = new SendMessageCommand(input);
-    const client = new SQSClient({ region: "eu-central-1", credentials: {accessKeyId:"AKIASYK3KO3UFTTPB4FY", secretAccessKey:"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"} });
-    try {
-      const data = await client.send(command);
-      updateScannedData([]);
-    } catch (error) {
-console.debug(error);
-      } finally {
-      // finally.
-    }
+    await AsyncStorage.removeItem('@barcodes');
+updateScannedData([]);
+    // const input = {
+    //   "QueueUrl": "https://sqs.eu-central-1.amazonaws.com/189706958568/dev-frontwit-scanned-barcode",
+    //   "MessageBody": JSON.stringify({"DUPA": "dupa"}),
+    //   "DelaySeconds": 0
+    // };
+    // const command = new SendMessageCommand(input);
+    // const client = new SQSClient({ region: "eu-central-1", credentials: {accessKeyId:"AKIASYK3KO3UFTTPB4FY", secretAccessKey:""} });
+    // try {
+    //   const data = await client.send(command);
+    //   updateScannedData([]);
+    // } catch (error) {
+    //     console.debug(error);
+    //   } finally {
+    //   // finally.
+    // }
    
   }
 
