@@ -10,6 +10,7 @@ import List from './src/List';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {SQSClient, SendMessageCommand} from '@aws-sdk/client-sqs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Snackbar} from "react-native-paper";
 
 const {width} = Dimensions.get('window');
 
@@ -18,6 +19,7 @@ export default function App() {
 
   const [scannedData, updateScannedData] = useState([]);
   const [isScannerOn, setScannerOn] = useState(false);
+  const [sendingResult, setSendingResult] = useState("");
   var sending = false;
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export default function App() {
         return;
       }
       await send();
-    }, 30000);
+    }, 5000);
   }, []);
 
   const send = async () => {
@@ -34,12 +36,14 @@ export default function App() {
     const client = new SQSClient({
       region: "eu-central-1",
       credentials: {
-
+        accessKeyId: "",
+        secretAccessKey: ""
       }
     });
     try {
       const barcodes = await getBarcodesFromStorage();
-      for (var i = 1; i < barcodes.length; i++) {
+      var successCounter = 0;
+      for (var i = 0; i < barcodes.length; i++) {
         const barcode = barcodes[i];
 
         const body = {
@@ -55,7 +59,14 @@ export default function App() {
         const command = new SendMessageCommand(input);
 
         const data = await client.send(command);
+        if (data.$metadata.httpStatusCode === 200) {
+          ++successCounter;
+        }
         await removeFromStorage(barcode);
+      }
+      if (successCounter > 0) {
+        setSendingResult("Wysłano " + successCounter + " / " + barcodes.length
+            + " elementów");
       }
     } catch (error) {
       console.debug(error);
@@ -68,7 +79,7 @@ export default function App() {
   const onScanned = (data) => {
     try {
       const scannedJson = JSON.parse(data);
-      if(scannedJson.front === null || scannedJson.front.barcode === null){
+      if (scannedJson.front === null || scannedJson.front.barcode === null) {
         throw new Error("Incorrect code");
       }
       scannedJson.scannedAt = Date.now();
@@ -166,6 +177,13 @@ export default function App() {
                       disabled={scannedData.length === 0}>Zapisz</Button>
             </View>
           </View>
+          <Snackbar
+              visible={sendingResult !== ""}
+              onDismiss={() => setSendingResult("")}
+              duration={3000}
+          >
+            {sendingResult}
+          </Snackbar>
         </View>
       </SafeAreaProvider>
   );
